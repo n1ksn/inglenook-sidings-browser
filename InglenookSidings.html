@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inglenook Sidings</title>
+  <!--------------------------------------------------------------------------
+  Calculate solutions to the Inglenook Sidings Puzzle, both the full-sized
+  (8 cars) and small (5 cars) verions.
+
+  The basic method used is an iterated depth-first search on a tree of state
+  nodes (puzzle configurations).  Node successors are the configurations
+  resulting from a "legal" move represented by an engine pulling or
+  dropping cars from one of three sidings connected to a switching lead.
+
+  Due to calculation times, for the full-sized puzzle a "heuristic"
+  solution is found by splicing together two partial solutions at an
+  intermediate node.  Consequently, the solution path length will often
+  not be minimal.  Additionally, such a heuristic solution is found in both
+  the forward and backward directions, and the shorter of the two is
+  chosen for display.
+
+  For the small version we can do a pure iterated depth-first search so
+  the resulting solutions have minimal path lengths.
+
+  The user can choose to have a random start configuration generated for
+  them, or they can supply their own (provided it conforms to the
+  track capacities and total number of cars).
+
+  Andrew Palm
+  n1ksn.qrp@gmail.com
+  2020-08-15
+
+--------------------------------------------------------------------------->
+  <script>
+  'use strict';
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        let temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+      }
+    }
+
+    // Return a random permutation of the list [1, ..., permLength]
+    function getRandomPerm(permLength) {
+      let permutation = [];
+      for (let i = 0; i < permLength; i++) {
+        permutation.push(i + 1);
+      }
+      shuffleArray(permutation);
+      return permutation;
+    }
+
+    // Construct a standard start or final state from a list of car numbers
+    function makeStdState(carList, trkCaps) {
+      let state = { t0: [0], t1: [], t2: [], t3: [], lastOpTrack: 0 };
+      for (let i = 0; i < trkCaps[1]; i++) { state.t1.push(carList.shift()); }
+      for (let i = 0; i < trkCaps[2]; i++) { state.t2.push(carList.shift()); }
+      let lastOpTrack = 0;
+      return state;
+    }
+
+    Array.prototype.isEmpty = function () {
+      return !Array.isArray(this) || !this.length;
+    };
+
+    function newCopyState(state) {
+      return {
+        t0: state.t0.slice(0), t1: state.t1.slice(0),
+        t2: state.t2.slice(0), t3: state.t3.slice(0),
+        lastOpTrack: state.lastOpTrack
+      };
+    }
+
+    function equalStates(state1, state2) {
+      return ((JSON.stringify(state1.t0) === JSON.stringify(state2.t0))
+        && (JSON.stringify(state1.t1) === JSON.stringify(state2.t1))
+        && (JSON.stringify(state1.t2) === JSON.stringify(state2.t2))
+        && (JSON.stringify(state1.t3) === JSON.stringify(state2.t3)));
+    }
+
+    // Return new state from pulling numPull cars from Track track (to Track 0)
+    // in state.  Return empty state if move is not possible.
+    function pullCars(state, numPulls, track, trkCaps) {
+
+      let newState = null;
+
+      switch (track) {
+        case 1: if ((state.t1.length >= numPulls) &&
+          ((trkCaps[0] - state.t0.length) >= numPulls)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numPulls; i++) {
+            newState.t0.push(newState.t1.shift());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        case 2: if ((state.t2.length >= numPulls) &&
+          ((trkCaps[0] - state.t0.length) >= numPulls)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numPulls; i++) {
+            newState.t0.push(newState.t2.shift());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        case 3: if ((state.t3.length >= numPulls) &&
+          ((trkCaps[0] - state.t0.length) >= numPulls)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numPulls; i++) {
+            newState.t0.push(newState.t3.shift());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        default: break;
+      }
+
+      return newState;
+    }
+
+    // Return new state from dropping numDrops cars (from Track 0) to Track
+    // track in state.  Return empty state if move is not possible.
+    function dropCars(state, numDrops, track, trkCaps) {
+
+      let newState = null;
+
+      switch (track) {
+        case 1: if ((state.t0.length > numDrops) &&
+          ((trkCaps[1] - state.t1.length) >= numDrops)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numDrops; i++) {
+            newState.t1.unshift(newState.t0.pop());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        case 2: if ((state.t0.length > numDrops) &&
+          ((trkCaps[2] - state.t2.length) >= numDrops)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numDrops; i++) {
+            newState.t2.unshift(newState.t0.pop());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        case 3: if ((state.t0.length > numDrops) &&
+          ((trkCaps[3] - state.t3.length) >= numDrops)) {
+          newState = newCopyState(state);
+          for (let i = 0; i < numDrops; i++) {
+            newState.t3.unshift(newState.t0.pop());
+          }
+          newState.lastOpTrack = track;
+        }
+          break;
+
+        default: break;
+      }
+
+      return newState;
+    }
+
+    // Given a state, return a list of its legal successor states
+    function successorStates(state, trkCaps) {
+
+      let maxPD = trkCaps[0] - 1;
+      let lOT = state.lastOpTrack;
+      let successors = [];
+      let newState;
+
+      // Requiring a successor to result from a move on a different track
+      // reduces the size of the search tree, but does not affect finding a
+      // minimal path.  Because no minimal solution will have two consecutive
+      // moves on the same track.
+      for (let ncars = maxPD; ncars > 0; ncars--) {
+        for (let trk = 1; trk < 4; trk++) {
+          if (trk != lOT) {   // See comment above
+            newState = pullCars(state, ncars, trk, trkCaps);
+            if (newState !== null) { successors.push(newState); }
+            newState = dropCars(state, ncars, trk, trkCaps);
+            if (newState !== null) { successors.push(newState); }
+          }
+        }
+      }
+
+      return successors;
+    }
+
+    // Given a path, return a list of allowed extensions constructed
+    // from successors of the last state in the path, not including
+    // successors that already appear in the path (to avoid cycles).
+    // No extension may exceed the given limit in length.
+    function pathExtensions(path, lenLimit, trkCaps) {
+
+      let extensions = [];
+      let npath = path.length;
+
+      // If path already at length limit, return empty list
+      if (npath >= (lenLimit + 1)) { return extensions; }
+
+      // Get last state in path and get its legal successors
+      let successors = successorStates(path[npath - 1], trkCaps);
+
+      // If path has no legal successors, return empty list
+      if (successors.isEmpty()) { return extensions; }
+
+      let nSucc = successors.length;
+      for (let i = 0; i < nSucc; i++) {
+        if (!(path.indexOf(successors[i]) >= 0)) {
+          let newPath = path.slice(0);
+          newPath.push(successors[i]);
+          extensions.push(newPath);
+        }
+      }
+
+      return extensions;
+    }
+
+    // Find path from start state to finish state with length <= lenLimit
+    // Uses limited depth-first search based on queue of paths from start
+    // state.
+    function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
+      trkCaps) {
+
+      // Ensure start state has zero lastOpTrack value so that there is
+      // no restriction on successor states at start
+      startState.lastOpTrack = 0;
+      // Initialize start path and path queue
+      let startPath = [startState];
+      let pathQueue = [startPath];
+      // The final state must always have at least 2 cars on track 1
+      let n1 = finalState.t1.length;
+      let car1 = finalState.t1[n1 - 1];
+      let car2 = finalState.t1[n1 - 2];
+
+      let firstPath = [];
+      while (!pathQueue.isEmpty()) {
+
+        firstPath = pathQueue.pop();
+        let lastState = firstPath[firstPath.length - 1];
+        // If first path in queue is a solution, return it.
+        // If last2Flag is true, a solution only matches the last
+        // 2 cars on T1 in the final state.  This is used for an
+        // intermediate step in a heuristic solution.
+        if (last2Flag) {
+          let n2 = lastState.t1.length;
+          if ((n2 > 1) && (lastState.t1[n2 - 1] == car1) &&
+             (lastState.t1[n2 - 2] == car2)) {
+               return firstPath;
+          }
+        } else {
+          if (equalStates(lastState, finalState)) {
+            return firstPath;
+          }
+        }
+        // Otherwise, replace first path with its extensions
+        let extList = pathExtensions(firstPath, lenLimit, trkCaps);
+        if (!extList.isEmpty()) {
+          let lexl = extList.length;
+          for (let i = 0; i < lexl; i++) {
+            pathQueue.push(extList.pop());
+          }
+        }
+
+      }
+
+      // If path not found, return empty path
+      startPath = [];
+      return startPath;
+    }
+
+    // Find solution using iterated depth-first search.  This finds a path
+    // of minimal length.
+    function findPureSolution(startState, finalState, maxLimit, trkCaps) {
+      let solution = [];
+      let lenLimit = 0;
+
+      while ((lenLimit < maxLimit) && solution.isEmpty()) {
+        lenLimit++;
+        solution = findSolutionLimited(startState, finalState,
+          lenLimit, false, trkCaps);
+      }
+
+      return solution;
+    }
+
+    // Find solution by splicing two "pure" solutions at an intermediate
+    // puzzle state.  The intermediate state is any state where the last
+    // two cars on Track 1 agree with those in the final state.
+    // This approach is used for the full-sized puzzle due to the length
+    // of the calculations needed.  The final path length is not necessarily
+    // minimal.
+    function findHeuristicSolution(startState, finalState, maxLimit, trkCaps) {
+
+      let solution1 = [];
+      let solution2 = [];
+
+      // First find pure solution to an intermediate state
+      let lenLimit = 0;
+
+      while ((lenLimit < maxLimit) && solution1.isEmpty()) {
+        lenLimit++;
+        solution1 = findSolutionLimited(startState, finalState,
+          lenLimit, true, trkCaps);
+      }
+
+      // Second find pure solution from intermediate state to final state
+      let newStartState = solution1.pop();
+      if (equalStates(newStartState, finalState)) {
+        solution1.push(newStartState);  // Intermediate node is finalState.  Done.
+      }
+      else {
+        let lastOpTrackSol1 = newStartState.lastOpTrack;
+        newStartState.lastOpTrack = 0;
+
+        lenLimit = 0;
+        while ((lenLimit < maxLimit) && solution2.isEmpty()) {
+          lenLimit++;
+          solution2 = findSolutionLimited(newStartState, finalState,
+            lenLimit, false, trkCaps);
+        }
+
+        // If track of first move in solution2 is the same as the track
+        // for the last move of solution1, drop the newStartState before
+        // joining the solutions (unless it is the finalState).
+        let firstOpTrackSol2 = solution2[1].lastOpTrack;
+        if ((firstOpTrackSol2 === lastOpTrackSol1) && (solution2.length > 1)) {
+          solution2.shift();
+        }
+        // Join the solutions
+        let lenSol2 = solution2.length;
+        for (let i = 0; i < lenSol2; i++) {
+          solution1.push(solution2.shift());
+        }
+      }
+
+      return solution1;
+    }
+
+    // Delete all rows in solution table, except the header row
+    function clearTable() {
+      let target = document.getElementById('table');
+      let numRows = target.rows.length;
+      for (let i = 1; i < numRows; i++) {
+        target.deleteRow(1);
+      }
+    }
+
+    function numArrayToString(a) {
+      let n = a.length;
+      let s = '';
+      for (let i = 0; i < n; i++) {
+        s = s + ' ' + a[i];
+      }
+      return s;
+    }
+
+    // Add a row to the solution table containing a move number and state
+    function addTableRow(stepNum, state) {
+      let target = document.getElementById('table');
+      let newRow = target.rows[0].cloneNode(true);
+      newRow.cells[0].innerText = stepNum;
+      newRow.cells[1].innerText = numArrayToString(state.t0).replace('0', 'E');
+      newRow.cells[2].innerText = numArrayToString(state.t1);
+      newRow.cells[3].innerText = numArrayToString(state.t2);
+      newRow.cells[4].innerText = numArrayToString(state.t3);
+      target.appendChild(newRow);
+    }
+
+    //--------------------------------------------------------------------------
+    // Some global variables for animation (more are below)
+    let _solution = [];
+    let _m = 0;
+    let _oldm;
+    let canv;
+    let ctx;
+    let _numCars;
+    let _trkCaps = [];
+    //--------------------------------------------------------------------------
+
+    // Clear the solution area
+    function clearSolution() {
+      let target = document.getElementById('againbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      target = document.getElementById('solvebtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      clearTable();
+      target = document.getElementById('nextbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      target = document.getElementById('lastbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      // Clear the animation
+      canv = document.getElementById("gc");
+      ctx = canv.getContext("2d");
+      clearCanvas();
+    }
+
+    // Reset puzzle type radio buttons and clear solution area.
+    // For use with puzzle size buttons and general page reset.
+    function resetPuzzle() {
+      let target = document.getElementById('rd3');
+      target.checked = true;  // Default is random
+      clearSolution();
+    }
+
+    // Reset
+    window.onreset = resetPuzzle;
+    window.onload = resetPuzzle;
+
+    // Open input boxes for car numbers on Tracks 1 and 2 for a custom
+    // start state.
+    function getCustom() {
+      clearSolution();
+      let target = document.getElementById('table');
+
+      // Start state
+      let newRow = target.rows[0].cloneNode(true);
+      newRow.cells[0].innerText = '0';
+      newRow.cells[1].innerText = 'E';
+      newRow.cells[2].innerHTML = '<tr><td><input id="trk1start" type="text" size=7em></td></tr>';
+      newRow.cells[3].innerHTML = '<tr><td><input id="trk2start" type="text" size=5em></td></tr>';
+      newRow.cells[4].innerHTML = '<tr><td><input id="trk3start" type="text" size=5em></td></tr>';
+      target.appendChild(newRow);
+
+      // Final state
+      newRow = target.rows[0].cloneNode(true);
+      newRow.cells[0].innerText = '???';
+      newRow.cells[1].innerText = 'E';
+      newRow.cells[2].innerHTML = '<tr><td><input id="trk1final" type="text" size=7em></td></tr>';
+      newRow.cells[3].innerHTML = '<tr><td><input id="trk2final" type="text" size=5em></td></tr>';
+      newRow.cells[4].innerHTML = '<tr><td><input id="trk3final" type="text" size=5em></td></tr>';
+      target.appendChild(newRow);
+      // Pre-fill final state to standard values
+      let rd1 = document.getElementById('rd1');
+      if (rd1.checked) {  // Full puzzle
+        newRow.cells[2].firstChild.value = '1 2 3 4 5';
+        newRow.cells[3].firstChild.value = '6 7 8';
+        newRow.cells[4].firstChild.value = '';
+      }
+      else {  // Small puzzle
+        newRow.cells[2].firstChild.value = '1 2 3';
+        newRow.cells[3].firstChild.value = '4 5';
+        newRow.cells[4].firstChild.value = '';
+      }
+
+    }
+
+    // Convert an array of tokens representing car numbers to an array
+    // of integers
+    function tokensToInts(tokens) {
+      if (tokens === '') { return []; }
+      let intArray = [];
+      for (let i = 0; i < tokens.length; i++) {
+        intArray.push(parseInt(tokens[i]));
+      }
+      return intArray;
+    }
+
+    // Make a new puzzle object that holds environmental variables and
+    // start and finish states
+    function makeNewPuzzle() {
+      let puzzle = {
+        version: 'full', numCars: 0, trkCaps: [],
+        startState: null, finalState: null
+      };
+      return puzzle;
+    }
+
+    // Set the start and final puzzle states based on user input
+    function setUpPuzzle() {
+
+      // Clear animation
+      let target = document.getElementById('nextbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      target = document.getElementById('lastbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      clearCanvas();
+
+      // Reset global variable
+      let puzzle = makeNewPuzzle();
+
+      // Get puzzle size from radio buttons and set version, number of cars,
+      // and track capacities accordingly
+      let rd1 = document.getElementById('rd1');
+      let rd2 = document.getElementById('rd2');
+      if (rd1.checked) puzzle.version = rd1.value;
+      if (rd2.checked) puzzle.version = rd2.value;
+
+      if (puzzle.version === 'small') {
+        puzzle.numCars = 5;
+        puzzle.trkCaps = [3, 3, 2, 2];
+      }
+      else {
+        puzzle.numCars = 8;
+        puzzle.trkCaps = [4, 5, 3, 3];
+      }
+      // For animation
+      _numCars = puzzle.numCars;
+      _trkCaps = puzzle.trkCaps.slice(0);
+      setCarPositions();
+
+      // Read type of start state from radio buttons and fill in a
+      // standard start state accordingly
+      let randomStart = true;
+      let startList = [];
+      let rd3 = document.getElementById('rd3');
+      let rd4 = document.getElementById('rd4');
+      if (rd3.checked) randomStart = true;
+      if (rd4.checked) randomStart = false;
+
+      if (randomStart) {
+        // Make a randomized standard start state
+        startList = getRandomPerm(puzzle.numCars);
+        puzzle.startState = makeStdState(startList, puzzle.trkCaps);
+        // Construct the standard final state
+        let finalList = [];
+        for (let i = 0; i < puzzle.numCars; i++) { finalList.push(i + 1); }
+        puzzle.finalState = makeStdState(finalList, puzzle.trkCaps);
+      }
+      else {
+        // Make a custom start state from the car numbers entered
+        // by the user
+        let trk1s = document.getElementById('trk1start').value.trim().split(/\D+/);
+        let trk2s = document.getElementById('trk2start').value.trim().split(/\D+/);
+        let trk3s = document.getElementById('trk3start').value.trim().split(/\D+/);
+        let trk1n = [];
+        let trk2n = [];
+        let trk3n = [];
+        if (trk1s != '') trk1n = tokensToInts(trk1s);
+        if (trk2s != '') trk2n = tokensToInts(trk2s);
+        if (trk3s != '') trk3n = tokensToInts(trk3s);
+
+        if (!customSetupOK(trk1n, trk2n, trk3n, puzzle)) return;
+
+        puzzle.startState = { t0: [0], t1: trk1n, t2: trk2n, t3: trk3n, lastOpTrack: 0 };
+
+        // Make a custom final state from the car numbers entered
+        // by the user
+        trk1s = document.getElementById('trk1final').value.split(/\D+/);
+        trk2s = document.getElementById('trk2final').value.split(/\D+/);
+        trk3s = document.getElementById('trk3final').value.split(/\D+/);
+        trk1n = [];
+        trk2n = [];
+        trk3n = [];
+        if (trk1s != '') trk1n = tokensToInts(trk1s);
+        if (trk2s != '') trk2n = tokensToInts(trk2s);
+        if (trk3s != '') trk3n = tokensToInts(trk3s);
+
+        if (!customSetupOK(trk1n, trk2n, trk3n, puzzle)) return;
+
+        puzzle.finalState = { t0: [0], t1: trk1n, t2: trk2n, t3: trk3n, lastOpTrack: 0 };
+      }
+
+      // Display the start and final states and a button to start solving
+      clearTable();
+      addTableRow(0, puzzle.startState);
+      addTableRow('???', puzzle.finalState);
+
+      target = document.getElementById('againbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+
+      // Create Solve Puzzle button and use it to pass the puzzle
+      // configuration to solvePuzzle function by storing its stringification
+      // in a data attribute.
+      target = document.getElementById('solvebtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn2 = document.createElement('button');
+      btn2.innerText = 'Solve Puzzle';
+      btn2.data = JSON.stringify(puzzle);
+      btn2.onclick = solvePuzzle;
+      btn2.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn2);
+
+    }
+
+    // Check for legal number of cars, car numbers, and track capacities
+    // in a custom setup
+    function customSetupOK(trk1n, trk2n, trk3n, puzzle) {
+      if (trk1n.length > puzzle.trkCaps[1]) {
+        alert(`*** Track 1 has more than ${puzzle.trkCaps[1]} cars`);
+        return false;
+      }
+      if (trk2n.length > puzzle.trkCaps[2]) {
+        alert(`*** Track 2 has more than ${puzzle.trkCaps[2]} cars`);
+        return false;
+      }
+      if (trk3n.length > puzzle.trkCaps[3]) {
+        alert(`*** Track 3 has more than ${puzzle.trkCaps[3]} cars`);
+        return false;
+      }
+      let startArray = [];
+      for (let i = 0; i < trk1n.length; i++) {
+        startArray.push(trk1n[i]);
+      }
+      for (let i = 0; i < trk2n.length; i++) {
+        startArray.push(trk2n[i]);
+      }
+      for (let i = 0; i < trk3n.length; i++) {
+        startArray.push(trk3n[i]);
+      }
+      startArray.sort(function (a, b) { return a - b; });
+      if (puzzle.version === 'small') {
+        let chkArr = [1, 2, 3, 4, 5];
+        if (!(JSON.stringify(startArray) === JSON.stringify(chkArr))) {
+          alert('*** Car numbers must be 1 through 5 ***');
+          return false;
+        }
+      }
+      else {
+        let chkArr = [1, 2, 3, 4, 5, 6, 7, 8];
+        if (!(JSON.stringify(startArray) === JSON.stringify(chkArr))) {
+          alert('*** Car numbers must be 1 through 8 ***');
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    // Solve the puzzle and display the solution in a table
+    function solvePuzzle() {
+
+      // Get the puzzle configuration stored in the Solve Puzzle
+      // button, then convert it to a "Working" indicator
+      let target = document.getElementById('solvebtn');
+      let puzzle = JSON.parse(target.firstChild.data);
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn2 = document.createElement('button');
+      btn2.innerText = 'Working';
+      btn2.style = 'color: red; font-size: 90%; font-weight: bold';
+      btn2.id = 'btn2';
+      target.appendChild(btn2);
+
+      // Remainder of calculations are inside a timeout to force display
+      // of Working button above while calculations proceed
+      setTimeout(function () {
+
+        // The solution approach depends on the puzzle version due to
+        // performance constraints.  For a full-sized puzzle we use
+        // heuristic solutions which make use of an intermediate state.
+        // For the small puzzle we can find an optimnally short "pure" solution.
+        let solution = [];
+        let revFlag = false;
+        if (puzzle.version === 'small') {
+          solution = findPureSolution(puzzle.startState, puzzle.finalState, 25, puzzle.trkCaps);
+          _solution = solution.slice(0);  // For animation
+        }
+        else {
+          // Find a forward heuristic solution from the start state to the
+          // final state and a reverse heuristic solution from the final state
+          // to the start state.  Use whichever is shorter.
+          let solution1 = [];
+          let solution2 = [];
+          solution1 = findHeuristicSolution(puzzle.startState, puzzle.finalState, 25, puzzle.trkCaps);
+          solution2 = findHeuristicSolution(puzzle.finalState, puzzle.startState, 25, puzzle.trkCaps);
+          let n1 = solution1.length;
+          let n2 = solution2.length;
+          if (n1 <= n2) {
+            solution = solution1;
+            revFlag = false;
+            _solution = solution.slice(0);    // For animation
+          }
+          else {
+            solution = solution2;
+            revFlag = true;
+            _solution = solution.slice(0);    // For animation
+            _solution.reverse();
+          }
+        }
+
+        displaySolution(solution, revFlag);
+        // Start animation
+        _m = 0;
+        nextMove();
+
+      }, 50); // End of timeout.  Positive delay needed for Firefox.
+
+    }
+
+    function displaySolution(solution, revFlag) {
+      // Display the solution.  If the reverse solution was used, display
+      // it reversed.
+      clearTable();
+      let numElts = solution.length;
+      if (!revFlag) {
+        for (let i = 0; i < numElts; i++) {
+          addTableRow(i, solution[i]);
+        }
+      }
+      else {
+        for (let i = numElts; i > 0; i--) {
+          addTableRow(numElts - i, solution[i - 1]);
+        }
+      }
+
+      // Set up single-step button below animation
+      let target = document.getElementById('nextbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn5 = document.createElement('button');
+      btn5.innerText = 'Next Move';
+      btn5.onclick = nextMove;
+      btn5.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn5);
+
+      // Set up reverse single-step button
+      target = document.getElementById('lastbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn6 = document.createElement('button');
+      btn6.innerText = 'Last Move';
+      btn6.onclick = lastMove;
+      btn6.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn6);
+
+      // Convert the working indicator to a done indicator and
+      // display a clear button
+      target = document.getElementById('againbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn3 = document.createElement('button');
+      btn3.innerText = 'Clear';
+      btn3.onclick = resetPuzzle;
+      btn3.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn3);
+
+      target = document.getElementById('solvebtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn2 = document.createElement('button');
+      btn2.innerText = 'Done!';
+      btn2.style = 'color: blue; font-size: 90%; font-weight: bold';
+      target.appendChild(btn2);
+    }
+
+    //--------------------------------------------------------------------------
+    // Global variables and functions to support animation
+
+    // More global variables that support the animation
+    let carColors = ["blueviolet", "dodgerblue", "green", "yellowgreen",
+      "yellow", "orange", "red", "firebrick"];
+    let engineColor = "black";
+
+    // The global values below are set for a 800 x 300 canvas
+    let carLength;
+    let carDelta;
+    let carWidth = 28;
+    let carGap = 4;
+    let engineHeadLength = 10;
+    // Track left-hand end X coordinates, not including short segments
+    // connecting to ladder track
+    let track0BaseX = 40;
+    let track1BaseX = 390;
+    let track2BaseX = 440;
+    let track3BaseX = 490;
+    // Track Y coordinates
+    let track0BaseY = 225;
+    let track1BaseY = track0BaseY;
+    let track2BaseY = 150;
+    let track3BaseY = 75;
+    // Base coordinates (ULH corners) for car positions
+    let carTrack0PosX = [];
+    let carTrack1PosX = [];
+    let carTrack2PosX = [];
+    let carTrack3PosX = [];
+
+    function setCarPositions() {
+      // Scale car length for puzzle size, = 60 for full size
+      // Length 60 is scaled for 800 x 300 canvas
+      carLength = 60 * (8 / _numCars);
+      carDelta = carLength + carGap;
+
+      carTrack0PosX = [track0BaseX + 2 * carGap];
+      carTrack1PosX = [track1BaseX];
+      carTrack2PosX = [track2BaseX];
+      carTrack3PosX = [track3BaseX];
+      for (let i = 1; i <= _trkCaps[0]; i++) {
+        carTrack0PosX.push(carTrack0PosX[0] + i * carDelta);
+      }
+      for (let i = 1; i <= _trkCaps[1]; i++) {
+        carTrack1PosX.push(carTrack1PosX[0] + i * carDelta);
+      }
+      for (let i = 1; i <= _trkCaps[2]; i++) {
+        carTrack2PosX.push(carTrack2PosX[0] + i * carDelta);
+      }
+      for (let i = 1; i <= _trkCaps[3]; i++) {
+        carTrack3PosX.push(carTrack3PosX[0] + i * carDelta);
+      }
+    }
+
+    function clearCanvas() {
+      let width = canv.getAttribute("width");
+      let height = canv.getAttribute("height");
+      let gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, "#eeeeee");
+      gradient.addColorStop(1, "#aaaaaa");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      let target = document.getElementById('move_desc');
+      target.innerHTML = '';
+    }
+
+    function drawTracks() {
+      ctx.fillStyle = "black";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+
+      // Main track sections
+      ctx.moveTo(track0BaseX, track0BaseY);
+      ctx.lineTo(track0BaseX + _trkCaps[0] * carDelta + carGap, track0BaseY);
+      ctx.stroke();
+      ctx.moveTo(track1BaseX, track1BaseY);
+      ctx.lineTo(track1BaseX + _trkCaps[1] * carDelta + carGap, track1BaseY);
+      ctx.stroke();
+      ctx.moveTo(track2BaseX, track2BaseY);
+      ctx.lineTo(track2BaseX + _trkCaps[2] * carDelta + carGap, track2BaseY);
+      ctx.stroke();
+      ctx.moveTo(track3BaseX, track3BaseY);
+      ctx.lineTo(track3BaseX + _trkCaps[3] * carDelta + carGap, track3BaseY);
+      ctx.stroke();
+
+      // Ladder track
+      let ladderHalfWidth = (track1BaseX - track0BaseX - _trkCaps[0] * carDelta - carGap) / 2;
+      let ladderBaseX = track1BaseX - ladderHalfWidth;
+      let ladderBaseY = track0BaseY;
+      let ladderEndX = track3BaseX - ladderHalfWidth;
+      let ladderEndY = track3BaseY;
+      ctx.moveTo(ladderBaseX, ladderBaseY);
+      ctx.lineTo(ladderEndX, ladderEndY);
+      ctx.stroke();
+
+      // Short section connecting main track sections to ladder
+      ctx.moveTo(ladderBaseX - ladderHalfWidth, track0BaseY);
+      ctx.lineTo(ladderBaseX + ladderHalfWidth, track0BaseY);
+      ctx.stroke();
+      ctx.moveTo(track2BaseX, track2BaseY);
+      ctx.lineTo(track2BaseX - ladderHalfWidth, track2BaseY);
+      ctx.stroke();
+      ctx.moveTo(track3BaseX, track3BaseY);
+      ctx.lineTo(track3BaseX - ladderHalfWidth - 2, track3BaseY);
+      ctx.stroke();
+
+      // Draw track numbers
+      ctx.font = (carWidth - 8) + "px Monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      // Value 790 scaled for 800 width canvas
+      ctx.fillText('Trk 1', 790, track1BaseY - (carWidth / 3));
+      ctx.fillText('Trk 2', 790, track2BaseY - (carWidth / 3));
+      ctx.fillText('Trk 3', 790, track3BaseY - (carWidth / 3));
+    }
+
+    // Not used in this version.  Kept for possible future fancier
+    // animation.
+    //function rotateCar(basex, basey, angle = 0) {
+    //  ctx.translate(basex + (carLength/2), basey + (carWidth/2));
+    //  ctx.rotate(angle);
+    //  ctx.translate(-basex - (carLength/2), -basey - (carWidth/2));
+    //}
+
+    function drawEngine(basex, basey, angle = 0) {
+
+      //if (angle != 0) rotateCar(basex, basey, angle);
+
+      let engineHeadBase = basex + carLength - engineHeadLength;
+      ctx.fillStyle = engineColor;
+      // Draw main part of engine body
+      ctx.fillRect(basex, basey, carLength - engineHeadLength, carWidth);
+      // Draw pointed front on engine (east end)
+      let engineHead = new Path2D();
+      engineHead.moveTo(engineHeadBase, basey);
+      engineHead.lineTo(engineHeadBase + engineHeadLength, basey + (carWidth / 2));
+      engineHead.lineTo(engineHeadBase, basey + carWidth);
+      engineHead.lineTo(engineHeadBase, basey);
+      ctx.fill(engineHead);
+
+      //if (angle != 0) rotateCar(basex, basey, -angle);
+
+    }
+
+    function drawCar(n, basex, basey, angle = 0) {
+
+      ctx.font = (carWidth - 5) + "px Monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+
+      //if (angle != 0) rotateCar(basex, basey, angle);
+
+      ctx.fillStyle = carColors[n - 1];
+      ctx.fillRect(basex, basey, carLength, carWidth);
+      // Draw car number
+      ctx.fillStyle = "black";
+      ctx.fillText(n, basex + (carLength / 2), basey + carWidth);
+
+      //if (angle != 0) rotateCar(basex, basey, -angle);
+    }
+
+    function drawState({ t0: trk0, t1: trk1, t2: trk2, t3: trk3, lastOpTrack: lOT }) {
+      // Draw engine and cars on track positions based on puzzle state
+      // Cars on tracks 1, 2, and 3 are left-justified.  Cars on track 0
+      // (the lead track) are right-justified.
+      let n0 = trk0.length;
+      let n1 = trk1.length;
+      let n2 = trk2.length;
+      let n3 = trk3.length;
+
+      if (n0 > 0) {
+        for (let n = 0; n < n0; n++) {
+          if (trk0[n] == 0) {
+            // Note X offset _trkCaps[0]-n0 which right-justifies cars on
+            // lead track.  This makes animation look better.
+            drawEngine(carTrack0PosX[n + _trkCaps[0] - n0], track0BaseY - (carWidth / 2));
+          } else {
+            drawCar(trk0[n], carTrack0PosX[n + _trkCaps[0] - n0], track0BaseY - (carWidth / 2));
+          }
+        }
+      }
+      if (n1 > 0) {
+        for (let n = 0; n < n1; n++) {
+          if (trk1[n] == 0) {
+            drawEngine(carTrack1PosX[n], track1BaseY - (carWidth / 2));
+          } else {
+            drawCar(trk1[n], carTrack1PosX[n], track1BaseY - (carWidth / 2));
+          }
+        }
+      }
+      if (n2 > 0) {
+        for (let n = 0; n < n2; n++) {
+          if (trk2[n] == 0) {
+            drawEngine(carTrack2PosX[n], track2BaseY - (carWidth / 2));
+          } else {
+            drawCar(trk2[n], carTrack2PosX[n], track2BaseY - (carWidth / 2));
+          }
+        }
+      }
+      if (n3 > 0) {
+        for (let n = 0; n < n3; n++) {
+          if (trk3[n] == 0) {
+            drawEngine(carTrack3PosX[n], track3BaseY - (carWidth / 2));
+          } else {
+            drawCar(trk3[n], carTrack3PosX[n], track3BaseY - (carWidth / 2));
+          }
+        }
+      }
+
+    }
+
+    function describeMove(s1, s2) {
+      // Determine number of cars moved and track involved
+      // when going from state s1 to state s2.  Used for animation caption.
+      let n10 = s1.t0.length;
+      let n20 = s2.t0.length;
+      let plural = 's';
+      let dir1 = 'Pull';
+      let dir2 = 'from';
+      let nCars = n20 - n10;
+      if (nCars < 0) {
+        dir1 = 'Drop';
+        dir2 = 'to';
+        nCars = -nCars;
+      }
+      if (nCars == 1) plural = '';
+
+      let diff2 = s2.t2.length - s1.t2.length;
+      let diff3 = s2.t3.length - s1.t3.length;
+      let trkNum = 1;
+      if (diff2 != 0) trkNum = 2;
+      if (diff3 != 0) trkNum = 3;
+
+      return `${dir1} ${nCars} car${plural} ${dir2} Track ${trkNum}`;
+    }
+
+    // This function is set up to single-step through the solution
+    // moves when the button below the animation is pushed.  It is
+    // called for the first time with the global variable _m = 0 and
+    // the solution referenced by the global variable _solution.
+    // After the last move, the caption displays "Done" and the button
+    // can be pushed to set up a repeat of the sequence.
+    function nextMove() {
+      // Redraw canvas to display next puzzle state
+      let numMoves = _solution.length - 1;
+      clearCanvas();
+      drawTracks();
+      drawState(_solution[_m]);
+
+      // Display animation caption
+      let target = document.getElementById('move_desc');
+      if (_m == 0) {
+        target.innerHTML = 'Start';
+      } else if (_oldm == _m) {
+        // After last move, print total moves
+        target.innerHTML = `Done in ${numMoves} moves`;
+        target = document.getElementById('nextbtn');
+        while (target.firstChild) {
+          target.removeChild(target.lastChild);
+        };
+        // Change button for starting a repeat sequence of moves
+        let btn5 = document.createElement('button');
+        btn5.innerText = 'Repeat Moves';
+        btn5.onclick = repeatMoves;
+        btn5.style = 'color: green; font-size: 90%; font-weight: bold';
+        target.appendChild(btn5);
+        // Blank out last move button
+        target = document.getElementById('lastbtn');
+        while (target.firstChild) {
+          target.removeChild(target.lastChild);
+        };
+      } else {
+        // Print caption for move _m
+        target.innerHTML = `Move ${_m}:  ${describeMove(_solution[_m - 1], _solution[_m])}`;
+      }
+
+      // Increase index _m until it reaches numMoves
+      _oldm = _m;  // Used to detect when last move has occurred
+      _m = Math.min(_m + 1, numMoves);
+    }
+
+    function lastMove() {
+      if (_m == _oldm) {
+        // Caption is showing last move
+        _m = _m - 1;
+        _oldm = _m - 1;
+      } else {
+        _m = Math.max(_m - 2, 0);
+        _oldm = Math.max(_oldm - 2, 0);
+      }
+      nextMove();
+    }
+
+    function repeatMoves() {
+      // Reset animation to repeat solution moves
+      let target = document.getElementById('nextbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn5 = document.createElement('button');
+      btn5.innerText = 'Next Move';
+      btn5.onclick = nextMove;
+      btn5.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn5);
+
+      target = document.getElementById('lastbtn');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      };
+      let btn6 = document.createElement('button');
+      btn6.innerText = 'Last Move';
+      btn6.onclick = lastMove;
+      btn6.style = 'color: green; font-size: 90%; font-weight: bold';
+      target.appendChild(btn6);
+
+      _m = 0;
+      nextMove();
+
+    }
+
+  </script>
+  <style type=text/css>
+    body {
+      font: normal normal 125% monospace;
+      font-weight: bold;
+      background-image: linear-gradient(130deg, white, #77797e);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id='mainTitle'>
+    <h3 style='text-align: center; color: rgb(9, 99, 177); border: 2px solid rgb(9, 99, 177)'>
+      The Inglenook Sidings Puzzle</h3>
+  </div>
+
+  <style type=text/css>
+    .grid-container {
+      display: grid;
+      grid-template-columns: 2fr 2fr 5fr;
+      grid-template-rows: 5em;
+      grid-gap: 0px;
+    }
+
+    .chooseSize {
+      grid-area: 1 / 1 / 2 / 2;
+      background-image: linear-gradient(130deg, #eeeeee, rgb(76, 160, 233));
+    }
+
+    .chooseStartType {
+      grid-area: 1 / 2 / 2 / 3;
+      background-image: linear-gradient(130deg, #eeeeee, rgb(240, 238, 140));
+    }
+
+    .results {
+      grid-area: 2 / 1 / 3 / 3;
+      background-image: linear-gradient(130deg, #dddddd, rgb(93, 153, 93));
+    }
+
+    .instructions {
+      grid-area: 1 / 3 / 3 / 4;
+    }
+
+    canvas {
+      font: normal normal 150% monospace;
+      font-weight: bold;
+      background-image: linear-gradient(130deg, #eeeeee, #aaaaaa);
+    }
+  </style>
+
+  <div class='grid-container'>
+
+    <div class='chooseSize' id='chooseSize' style='padding-left: 1em; padding-top: 5px'>
+      <u>Puzzle size</u>
+      <form>
+        <input id='rd1' name='grp1' type='radio' onclick='resetPuzzle()' value='full' checked>
+        <label for='rd1'>Full</label><br>
+        <input id='rd2' name='grp1' type='radio' onclick='resetPuzzle()' value='small'>
+        <label for='rd2'>Small</label><br>
+      </form>
+    </div>
+
+    <div class='chooseStartType' id='chooseStartType' style='padding-left: 1em; padding-top: 5px'>
+      <u>Puzzle type</u>
+      <form>
+        <input id='rd3' name='grp2' type='radio' onclick='clearSolution()' checked>
+        <label for='rd3'>Random</label><br>
+        <input id='rd4' name='grp2' type='radio' onclick='getCustom()'>
+        <label for='rd4'>Custom</label><br>
+      </form>
+    </div>
+
+    <div class='results' id='results' style='padding-left: 3px; padding-right: 3px; padding-top: 5px'>
+      <button onclick='setUpPuzzle()' id='btn1' style='color: green; font-size: 90%; font-weight: bold'>
+        Set Up Puzzle</button>
+      <p></p>
+      <div id='solution'>
+        <style type=text/css>
+          #table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+
+          #table th,
+          #table td {
+            text-align: left;
+            padding-left: 3px;
+            border: 1px solid gray;
+          }
+
+          #trk1start {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+
+          #trk2start {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+
+          #trk3start {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+
+          #trk1final {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+
+          #trk2final {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+
+          #trk3final {
+            font: monospace;
+            font-size: 80%;
+            font-weight: bold;
+          }
+        </style>
+        <table id='table'>
+          <col style='width: 10%'>
+          <col style='width: 24%'>
+          <col style='width: 28%'>
+          <col style='width: 19%'>
+          <col style='width: 19%'>
+          <tr>
+            <th>Move</th>
+            <th>Lead</th>
+            <th>Track 1</th>
+            <th>Track 2</th>
+            <th>Track 3</th>
+          </tr>
+        </table>
+      </div>
+      <p></p>
+      <div id='solvebtn'></div>
+      <p></p>
+      <div id='againbtn'></div>
+    </div>
+
+    <div class='instructions' id='instructions'>
+      <p style='text-align: center;'><u>Description</u></p>
+      <ul type='square'>
+        <li>The track layout consists of three single-ended sidings, Tracks 1, 2, and 3 connected on their west ends to
+          a switching (shunting) lead, Track 0, with an engine on its west (bumper) end.</li>
+        <br>
+        <li>There are two versions of the puzzle, Full with 8 cars and Small with 5 cars. The track capacities are as
+          follows (Small version values are in parentheses):
+          <ul>
+            <br>
+            <li>Track 0: Engine + 3 (2) cars</li>
+            <li>Track 1: 5 (3) cars</li>
+            <li>Tracks 2 and 3: 3 (2) cars each</li>
+          </ul>
+        </li>
+        <br>
+        <li>The standard start condition has tracks 1 and 2 filled to their capacities with the cars numbered randomly
+          from 1 to 8 (5).</li>
+        <br>
+        <li>The engine makes a series of moves (pulls or drops) until tracks 1 and 2 are again filled to capacity, but
+          the car numbers are in order, starting with the west end of Track 1.</li>
+      </ul>
+      <p style='text-align: center;'><u>Instructions</u></p>
+      <ol type='1'>
+        <li>Select puzzle size.</li>
+        <li>Select puzzle type, either standard random or custom.</li>
+        <li>To specify a custom start and finish, enter car numbers in the desired order for Tracks 1, 2, and 3. The
+          numbers must be from 1 to 8 (5).
+          The finish is pre-filled to a standard finish, but can be overwritten.
+          <u>You may not exceed the track capacities (see description above)</u>.
+        </li>
+        <li>Click on the "Set Up Puzzle" button to view the start and finish configurations. The engine is denoted by an
+          "E".</li>
+        <li>If these are OK, view the computer's solution by clicking on the "Solve Puzzle" button. The solution is
+          presented as a series of puzzle configurations resulting from a sequence of moves by the engine.
+          (<u>If the browser complains, tell it to wait, as some solutions take a while to find.</u>)</li>
+        <li>Scroll down to run a simple animation of the solution.</li>
+        <li>Click the "Clear" button to start another session.</li>
+      </ol>
+      <p style='text-align: right; color:black;'>Andrew Palm, August 2020</p>
+    </div>
+
+  </div>
+  <p></p>
+  <center>
+    <canvas id="gc" width="800" height="300"></canvas>
+    <p></p>
+    <h2 id="move_desc"></h2>
+    <p></p>
+    <div class='button-wrapper'>
+      <div id='nextbtn' style='display: inline-block'></div>
+      <div id='lastbtn' style='display: inline-block'></div>
+    </div>
+  </center>
+</body>
+
+</html>

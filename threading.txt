@@ -1,0 +1,27 @@
+
+In order to call local web workers in InglenookSidingsThreaded.html you
+must either run it in a browser set up as a local server or do the
+following:
+
+- In Firefox, go to about:config and set the following flag to "false":
+
+      security.fileuri.strict_origin_policy
+
+- In Chrome, start it with the command line option
+
+      --allow-file-access-from-files
+
+
+To set up a local server, go to the folder holding the file and web
+worker and enter
+
+  > python3 -m http.server
+
+and open a browser at the address returned (e.g., 0.0.0.0:8000).
+
+In Windows you may need to install python3 and use the same command
+but without the "3" at the end of "python".
+
+Setting up a local server is the only way to use this program with
+Microsoft Edge.
+
