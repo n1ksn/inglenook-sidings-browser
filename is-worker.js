@@ -3,9 +3,9 @@
 // It is only used for the full puzzle version.
 'use strict';
 
-Array.prototype.isEmpty = function() {
-  return !Array.isArray(this) || !this.length;
-};
+function arrayIsEmpty(array) {
+  return !(Array.isArray(array) && array.length > 0);
+}
 
 function newCopyState(state) {
   return { t0: state.t0.slice(0), t1: state.t1.slice(0),
@@ -121,7 +121,7 @@ function successorStates(state, trkCaps) {
   // moves on the same track.
   for (let ncars = maxPD; ncars > 0; ncars--) {
     for (let trk = 1; trk < 4; trk++) {
-      if (trk != lOT) {   // See comment above
+      if (trk !== lOT) {   // See comment above
         newState = pullCars(state, ncars, trk, trkCaps);
         if (newState !== null) { successors.push(newState); }
         newState = dropCars(state, ncars, trk, trkCaps);
@@ -149,7 +149,7 @@ function pathExtensions(path, lenLimit, trkCaps) {
   let successors = successorStates(path[npath - 1], trkCaps);
 
   // If path has no legal successors, return empty list
-  if (successors.isEmpty()) { return extensions; }
+  if (arrayIsEmpty(successors)) { return extensions; }
 
   let nSucc = successors.length;
   for (let i = 0; i < nSucc; i++) {
@@ -181,7 +181,7 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
   let car2 = finalState.t1[n1 - 2];
 
   let firstPath = [];
-  while (!pathQueue.isEmpty()) {
+  while (!arrayIsEmpty(pathQueue)) {
 
     firstPath = pathQueue.pop();
     let lastState = firstPath[firstPath.length - 1];
@@ -191,8 +191,8 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
     // intermediate step in a heuristic solution.
     if (last2Flag) {
       let n2 = lastState.t1.length;
-      if ((n2 > 1) && (lastState.t1[n2 - 1] == car1) &&
-            (lastState.t1[n2 - 2] == car2)) {
+      if ((n2 > 1) && (lastState.t1[n2 - 1] === car1) &&
+            (lastState.t1[n2 - 2] === car2)) {
         return firstPath;
       }
     } else {
@@ -202,7 +202,7 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
     }
     // Otherwise, replace first path with its extensions
     let extList = pathExtensions(firstPath, lenLimit, trkCaps);
-    if (!extList.isEmpty()) {
+    if (!arrayIsEmpty(extList)) {
       let lexl = extList.length;
       for (let i = 0; i < lexl; i++) {
         pathQueue.push(extList.pop());
@@ -230,7 +230,7 @@ function findHeuristicSolution(startState, finalState, maxLimit, trkCaps) {
   // First find pure solution to an intermediate state
   let lenLimit = 0;
 
-  while ((lenLimit < maxLimit) && solution1.isEmpty()) {
+  while ((lenLimit < maxLimit) && arrayIsEmpty(solution1)) {
     lenLimit++;
     solution1 = findSolutionLimited(startState, finalState,
                 lenLimit, true, trkCaps);
@@ -246,7 +246,7 @@ function findHeuristicSolution(startState, finalState, maxLimit, trkCaps) {
     newStartState.lastOpTrack = 0;
 
     lenLimit = 0;
-    while ((lenLimit < maxLimit) && solution2.isEmpty()) {
+    while ((lenLimit < maxLimit) && arrayIsEmpty(solution2)) {
       lenLimit++;
       solution2 = findSolutionLimited(newStartState, finalState,
                   lenLimit, false, trkCaps);

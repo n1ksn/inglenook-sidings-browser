@@ -41,29 +41,30 @@
 
   Andrew Palm
   n1ksn.qrp@gmail.com
-  2020-08-15
+  2020-08-21
 
 --------------------------------------------------------------------------->
 <script>
 'use strict';
 
 function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-      let j = Math.floor(Math.random() * (i + 1));
-      let temp = array[i];
-      array[i] = array[j];
-      array[j] = temp;
+  let newArray = array.slice(0);
+  for (let i = newArray.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    let temp = newArray[i];
+    newArray[i] = newArray[j];
+    newArray[j] = temp;
   }
+  return newArray;
 }
 
 // Return a random permutation of the list [1, ..., permLength]
-function getRandomPerm (permLength) {
+function getRandomPerm(permLength) {
   let permutation = [];
   for (let i = 0; i < permLength; i++) {
     permutation.push(i + 1);
   }
-  shuffleArray(permutation);
-  return permutation;
+  return shuffleArray(permutation);
 }
 
 // Construct a standard start or final state from a list of car numbers
@@ -71,13 +72,12 @@ function makeStdState(carList, trkCaps) {
   let state = { t0: [0], t1: [], t2: [], t3: [], lastOpTrack: 0 };
   for (let i = 0; i < trkCaps[1]; i++) {state.t1.push(carList.shift());}
   for (let i = 0; i < trkCaps[2]; i++) {state.t2.push(carList.shift());}
-  let lastOpTrack = 0;
   return state;
 }
 
-Array.prototype.isEmpty = function() {
-  return !Array.isArray(this) || !this.length;
-};
+function arrayIsEmpty(array) {
+  return !(Array.isArray(array) && array.length > 0);
+}
 
 function newCopyState(state) {
   return { t0: state.t0.slice(0), t1: state.t1.slice(0),
@@ -192,7 +192,7 @@ function successorStates(state, trkCaps) {
   // moves on the same track.
   for (let ncars = maxPD; ncars > 0; ncars--) {
     for (let trk = 1; trk < 4; trk++) {
-      if (trk != lOT) {   // See comment above
+      if (trk !== lOT) {   // See comment above
         newState = pullCars(state, ncars, trk, trkCaps);
         if (newState !== null) { successors.push(newState); }
         newState = dropCars(state, ncars, trk, trkCaps);
@@ -220,7 +220,7 @@ function pathExtensions(path, lenLimit, trkCaps) {
   let successors = successorStates(path[npath - 1], trkCaps);
 
   // If path has no legal successors, return empty list
-  if (successors.isEmpty()) { return extensions; }
+  if (arrayIsEmpty(successors)) { return extensions; }
 
   let nSucc = successors.length;
   for (let i = 0; i < nSucc; i++) {
@@ -252,7 +252,7 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
   let car2 = finalState.t1[n1 - 2];
 
   let firstPath = [];
-  while (!pathQueue.isEmpty()) {
+  while (!arrayIsEmpty(pathQueue)) {
 
     firstPath = pathQueue.pop();
     let lastState = firstPath[firstPath.length - 1];
@@ -262,8 +262,8 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
     // intermediate step in a heuristic solution.
     if (last2Flag) {
       let n2 = lastState.t1.length;
-      if ((n2 > 1) && (lastState.t1[n2 - 1] == car1) &&
-            (lastState.t1[n2 - 2] == car2)) {
+      if ((n2 > 1) && (lastState.t1[n2 - 1] === car1) &&
+            (lastState.t1[n2 - 2] === car2)) {
         return firstPath;
       }
     } else {
@@ -273,7 +273,7 @@ function findSolutionLimited(startState, finalState, lenLimit, last2Flag,
     }
     // Otherwise, replace first path with its extensions
     let extList = pathExtensions(firstPath, lenLimit, trkCaps);
-    if (!extList.isEmpty()) {
+    if (!arrayIsEmpty(extList)) {
       let lexl = extList.length;
       for (let i = 0; i < lexl; i++) {
         pathQueue.push(extList.pop());
@@ -293,7 +293,7 @@ function findPureSolution(startState, finalState, maxLimit, trkCaps) {
     let solution = [];
     let lenLimit = 0;
 
-    while ((lenLimit < maxLimit) && solution.isEmpty()) {
+    while ((lenLimit < maxLimit) && arrayIsEmpty(solution)) {
       lenLimit++;
       solution = findSolutionLimited(startState, finalState,
                  lenLimit, false, trkCaps);
@@ -315,7 +315,7 @@ function numArrayToString(a) {
   let n = a.length;
   let s = '';
   for (let i = 0; i < n; i++) {
-    s = s + ' ' + a[i];
+    s = `${s} ${a[i]}`;
   }
   return s;
 }
@@ -363,8 +363,8 @@ function clearSolution() {
     target.removeChild(target.lastChild);
   };
   // Clear the animation
-	canv = document.getElementById("gc");
-  ctx = canv.getContext("2d");
+	canv = document.getElementById('gc');
+  ctx = canv.getContext('2d');
   clearCanvas();
 }
 
@@ -627,15 +627,12 @@ function solvePuzzle() {
     let solution = [];
     let revFlag = false;
     if (puzzle.version === 'small') {
-
       solution = findPureSolution(puzzle.startState, puzzle.finalState, 25, puzzle.trkCaps);
       _solution = solution.slice(0);  // For animation
-
       displaySolution(solution, revFlag);
       // Start animation
       _m = 0;
       nextMove();
-
     }
     else {
 
@@ -762,27 +759,27 @@ function displaySolution(solution, revFlag) {
 // Global variables and functions to support animation
 
 // More global variables that support the animation
-let carColors = ["blueviolet", "dodgerblue", "green", "yellowgreen",
-								"yellow", "orange", "red", "firebrick"];
-let engineColor = "black";
+let carColors = ['blueviolet', 'dodgerblue', 'green', 'yellowgreen',
+								'yellow', 'orange', 'red', 'firebrick'];
+let engineColor = 'black';
 
 // The global values below are set for a 800 x 300 canvas
 let carLength;
 let carDelta;
-let carWidth = 28;
-let carGap = 4;
-let engineHeadLength = 10;
+const carWidth = 28;
+const carGap = 4;
+const engineHeadLength = 10;
 // Track left-hand end X coordinates, not including short segments
 // connecting to ladder track
-let track0BaseX = 40;
-let track1BaseX = 390;
-let track2BaseX = 440;
-let track3BaseX = 490;
+const track0BaseX = 40;
+const track1BaseX = 390;
+const track2BaseX = 440;
+const track3BaseX = 490;
 // Track Y coordinates
-let track0BaseY = 225;
-let track1BaseY = track0BaseY;
-let track2BaseY = 150;
-let track3BaseY = 75;
+const track0BaseY = 225;
+const track1BaseY = track0BaseY;
+const track2BaseY = 150;
+const track3BaseY = 75;
 // Base coordinates (ULH corners) for car positions
 let carTrack0PosX = [];
 let carTrack1PosX = [];
@@ -814,11 +811,11 @@ function setCarPositions() {
 }
 
 function clearCanvas() {
-  let width = canv.getAttribute("width");
-  let height = canv.getAttribute("height");
+  let width = canv.getAttribute('width');
+  let height = canv.getAttribute('height');
 	let gradient = ctx.createLinearGradient(0, 0, width, height);
-	gradient.addColorStop(0, "#eeeeee");
-	gradient.addColorStop(1, "#aaaaaa");
+	gradient.addColorStop(0, '#eeeeee');
+	gradient.addColorStop(1, '#aaaaaa');
 	ctx.fillStyle = gradient;
 	ctx.fillRect(0, 0, width, height);
   let target = document.getElementById('move_desc');
@@ -826,7 +823,7 @@ function clearCanvas() {
 }
 
 function drawTracks() {
-	ctx.fillStyle = "black";
+	ctx.fillStyle = 'black';
 	ctx.lineWidth = 6;
 	ctx.beginPath();
 
@@ -845,11 +842,11 @@ function drawTracks() {
 	ctx.stroke();
 
   // Ladder track
-	let ladderHalfWidth = (track1BaseX - track0BaseX - _trkCaps[0]*carDelta - carGap)/2;
-	let ladderBaseX = track1BaseX - ladderHalfWidth;
-	let ladderBaseY = track0BaseY;
-	let ladderEndX = track3BaseX - ladderHalfWidth;
-	let ladderEndY = track3BaseY;
+	const ladderHalfWidth = (track1BaseX - track0BaseX - _trkCaps[0]*carDelta - carGap)/2;
+	const ladderBaseX = track1BaseX - ladderHalfWidth;
+	const ladderBaseY = track0BaseY;
+	const ladderEndX = track3BaseX - ladderHalfWidth;
+	const ladderEndY = track3BaseY;
 	ctx.moveTo(ladderBaseX, ladderBaseY);
 	ctx.lineTo(ladderEndX, ladderEndY);
 	ctx.stroke();
@@ -866,9 +863,9 @@ function drawTracks() {
 	ctx.stroke();
 
   // Draw track numbers
-  ctx.font = (carWidth - 8) + "px Monospace";
-	ctx.textAlign = "right";
-  ctx.textBaseline = "top";
+  ctx.font = (carWidth - 8) + 'px Monospace';
+	ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
   // Value 790 scaled for 800 width canvas
   ctx.fillText('Trk 1', 790, track1BaseY-(carWidth/3));
   ctx.fillText('Trk 2', 790, track2BaseY-(carWidth/3));
@@ -887,7 +884,7 @@ function drawEngine(basex, basey, angle = 0) {
 
 	//if (angle != 0) rotateCar(basex, basey, angle);
 
-	let engineHeadBase = basex + carLength - engineHeadLength;
+	const engineHeadBase = basex + carLength - engineHeadLength;
   ctx.fillStyle = engineColor;
   // Draw main part of engine body
 	ctx.fillRect(basex, basey, carLength - engineHeadLength, carWidth);
@@ -905,16 +902,16 @@ function drawEngine(basex, basey, angle = 0) {
 
 function drawCar(n, basex, basey, angle = 0) {
 
-	ctx.font = (carWidth - 5) + "px Monospace";
-	ctx.textAlign = "center";
-	ctx.textBaseline = "bottom";
+	ctx.font = (carWidth - 5) + 'px Monospace';
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'bottom';
 
 	//if (angle != 0) rotateCar(basex, basey, angle);
 
 	ctx.fillStyle = carColors[n-1];
 	ctx.fillRect(basex, basey, carLength, carWidth);
   // Draw car number
-  ctx.fillStyle = "black";
+  ctx.fillStyle = 'black';
 	ctx.fillText(n, basex + (carLength/2), basey + carWidth);
 
 	//if (angle != 0) rotateCar(basex, basey, -angle);
@@ -924,14 +921,14 @@ function drawState({ t0:trk0, t1:trk1, t2:trk2, t3:trk3, lastOpTrack: lOT}) {
   // Draw engine and cars on track positions based on puzzle state
   // Cars on tracks 1, 2, and 3 are left-justified.  Cars on track 0
   // (the lead track) are right-justified.
-	let n0 = trk0.length;
-	let n1 = trk1.length;
-	let n2 = trk2.length;
-	let n3 = trk3.length;
+	const n0 = trk0.length;
+	const n1 = trk1.length;
+	const n2 = trk2.length;
+	const n3 = trk3.length;
 
 	if (n0 > 0) {
 		for (let n = 0; n < n0; n++) {
-			if (trk0[n] == 0) {
+			if (trk0[n] === 0) {
         // Note X offset _trkCaps[0]-n0 which right-justifies cars on
         // lead track.  This makes animation look better.
 				drawEngine(carTrack0PosX[n+_trkCaps[0]-n0], track0BaseY-(carWidth/2));
@@ -942,7 +939,7 @@ function drawState({ t0:trk0, t1:trk1, t2:trk2, t3:trk3, lastOpTrack: lOT}) {
 	}
 	if (n1 > 0) {
 		for (let n = 0; n < n1; n++) {
-			if (trk1[n] == 0) {
+			if (trk1[n] === 0) {
 				drawEngine(carTrack1PosX[n], track1BaseY-(carWidth/2));
 			} else {
 				drawCar(trk1[n], carTrack1PosX[n], track1BaseY-(carWidth/2));
@@ -951,7 +948,7 @@ function drawState({ t0:trk0, t1:trk1, t2:trk2, t3:trk3, lastOpTrack: lOT}) {
 	}
 	if (n2 > 0) {
 		for (let n = 0; n < n2; n++) {
-			if (trk2[n] == 0) {
+			if (trk2[n] === 0) {
 				drawEngine(carTrack2PosX[n], track2BaseY-(carWidth/2));
 			} else {
 				drawCar(trk2[n], carTrack2PosX[n], track2BaseY-(carWidth/2));
@@ -960,7 +957,7 @@ function drawState({ t0:trk0, t1:trk1, t2:trk2, t3:trk3, lastOpTrack: lOT}) {
 	}
 	if (n3 > 0) {
 		for (let n = 0; n < n3; n++) {
-			if (trk3[n] == 0) {
+			if (trk3[n] === 0) {
 				drawEngine(carTrack3PosX[n], track3BaseY-(carWidth/2));
 			} else {
 				drawCar(trk3[n], carTrack3PosX[n], track3BaseY-(carWidth/2));
@@ -1010,9 +1007,9 @@ function nextMove() {
 
   // Display animation caption
 	let target = document.getElementById('move_desc');
-	if (_m == 0) {
+	if (_m === 0) {
 		target.innerHTML = 'Start';
-	} else if (_oldm == _m) {
+	} else if (_oldm === _m) {
     // After last move, print total moves
 		target.innerHTML = `Done in ${numMoves} moves`;
     target = document.getElementById('nextbtn');
@@ -1248,9 +1245,9 @@ The Inglenook Sidings Puzzle</h3>
 </div>
 <p></p>
 <center>
-<canvas id="gc" width="800" height="300"></canvas>
+<canvas id='gc' width='800' height='300'></canvas>
 <p></p>
-<h2 id="move_desc"></h2>
+<h2 id='move_desc'></h2>
 <p></p>
 <div class='button-wrapper'>
   <div id='nextbtn' style='display: inline-block'></div>
