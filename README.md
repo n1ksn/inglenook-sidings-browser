@@ -14,7 +14,7 @@ threaded.txt.
 is-worker.js - This is a helper for the threaded version above and must
 be in the same directory as it.
 
-overheads.md - More information on solution methods and results.
+overheads.md, overheads.html - More information on solution methods and results.
 
 </font>
 
