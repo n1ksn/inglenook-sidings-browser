@@ -30,7 +30,7 @@
 
   Andrew Palm
   n1ksn.qrp@gmail.com
-  2020-08-21
+  2020-08-22
 
 --------------------------------------------------------------------------->
   <script>
@@ -77,10 +77,10 @@
     }
 
     function equalStates(state1, state2) {
-      return ((JSON.stringify(state1.t0) === JSON.stringify(state2.t0))
-        && (JSON.stringify(state1.t1) === JSON.stringify(state2.t1))
-        && (JSON.stringify(state1.t2) === JSON.stringify(state2.t2))
-        && (JSON.stringify(state1.t3) === JSON.stringify(state2.t3)));
+      return ((JSON.stringify(state1.t0) === JSON.stringify(state2.t0)) &&
+        (JSON.stringify(state1.t1) === JSON.stringify(state2.t1)) &&
+        (JSON.stringify(state1.t2) === JSON.stringify(state2.t2)) &&
+        (JSON.stringify(state1.t3) === JSON.stringify(state2.t3)));
     }
 
     // Return new state from pulling numPull cars from Track track (to Track 0)
@@ -215,7 +215,7 @@
 
       let nSucc = successors.length;
       for (let i = 0; i < nSucc; i++) {
-        if (!(path.indexOf(successors[i]) >= 0)) {
+        if (path.indexOf(successors[i]) < 0) {
           let newPath = path.slice(0);
           newPath.push(successors[i]);
           extensions.push(newPath);
@@ -392,20 +392,20 @@
       let target = document.getElementById('againbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       target = document.getElementById('solvebtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       clearTable();
       target = document.getElementById('nextbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       target = document.getElementById('lastbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       // Clear the animation
       canv = document.getElementById('gc');
       ctx = canv.getContext('2d');
@@ -490,11 +490,11 @@
       let target = document.getElementById('nextbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       target = document.getElementById('lastbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       clearCanvas();
 
       // Reset global variable
@@ -580,7 +580,7 @@
       target = document.getElementById('againbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
 
       // Create Solve Puzzle button and use it to pass the puzzle
       // configuration to solvePuzzle function by storing its stringification
@@ -588,7 +588,7 @@
       target = document.getElementById('solvebtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn2 = document.createElement('button');
       btn2.innerText = 'Solve Puzzle';
       btn2.data = JSON.stringify(puzzle);
@@ -602,15 +602,15 @@
     // in a custom setup
     function customSetupOK(trk1n, trk2n, trk3n, puzzle) {
       if (trk1n.length > puzzle.trkCaps[1]) {
-        alert(`*** Track 1 has more than ${puzzle.trkCaps[1]} cars`);
+        window.alert(`*** Track 1 has more than ${puzzle.trkCaps[1]} cars`);
         return false;
       }
       if (trk2n.length > puzzle.trkCaps[2]) {
-        alert(`*** Track 2 has more than ${puzzle.trkCaps[2]} cars`);
+        window.alert(`*** Track 2 has more than ${puzzle.trkCaps[2]} cars`);
         return false;
       }
       if (trk3n.length > puzzle.trkCaps[3]) {
-        alert(`*** Track 3 has more than ${puzzle.trkCaps[3]} cars`);
+        window.alert(`*** Track 3 has more than ${puzzle.trkCaps[3]} cars`);
         return false;
       }
       let startArray = [];
@@ -626,15 +626,15 @@
       startArray.sort(function (a, b) { return a - b; });
       if (puzzle.version === 'small') {
         let chkArr = [1, 2, 3, 4, 5];
-        if (!(JSON.stringify(startArray) === JSON.stringify(chkArr))) {
-          alert('*** Car numbers must be 1 through 5 ***');
+        if (JSON.stringify(startArray) !== JSON.stringify(chkArr)) {
+          window.alert('*** Car numbers must be 1 through 5 ***');
           return false;
         }
       }
       else {
         let chkArr = [1, 2, 3, 4, 5, 6, 7, 8];
-        if (!(JSON.stringify(startArray) === JSON.stringify(chkArr))) {
-          alert('*** Car numbers must be 1 through 8 ***');
+        if (JSON.stringify(startArray) !== JSON.stringify(chkArr)) {
+          window.alert('*** Car numbers must be 1 through 8 ***');
           return false;
         }
       }
@@ -651,7 +651,7 @@
       let puzzle = JSON.parse(target.firstChild.data);
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn2 = document.createElement('button');
       btn2.innerText = 'Working';
       btn2.style = 'color: red; font-size: 90%; font-weight: bold';
@@ -724,7 +724,7 @@
       let target = document.getElementById('nextbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn5 = document.createElement('button');
       btn5.innerText = 'Next Move';
       btn5.onclick = nextMove;
@@ -735,7 +735,7 @@
       target = document.getElementById('lastbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn6 = document.createElement('button');
       btn6.innerText = 'Last Move';
       btn6.onclick = lastMove;
@@ -747,7 +747,7 @@
       target = document.getElementById('againbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn3 = document.createElement('button');
       btn3.innerText = 'Clear';
       btn3.onclick = resetPuzzle;
@@ -757,7 +757,7 @@
       target = document.getElementById('solvebtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn2 = document.createElement('button');
       btn2.innerText = 'Done!';
       btn2.style = 'color: blue; font-size: 90%; font-weight: bold';
@@ -1024,7 +1024,7 @@
         target = document.getElementById('nextbtn');
         while (target.firstChild) {
           target.removeChild(target.lastChild);
-        };
+        }
         // Change button for starting a repeat sequence of moves
         let btn5 = document.createElement('button');
         btn5.innerText = 'Repeat Moves';
@@ -1035,7 +1035,7 @@
         target = document.getElementById('lastbtn');
         while (target.firstChild) {
           target.removeChild(target.lastChild);
-        };
+        }
       } else {
         // Print caption for move _m
         target.innerHTML = `Move ${_m}:  ${describeMove(_solution[_m - 1], _solution[_m])}`;
@@ -1063,7 +1063,7 @@
       let target = document.getElementById('nextbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn5 = document.createElement('button');
       btn5.innerText = 'Next Move';
       btn5.onclick = nextMove;
@@ -1073,7 +1073,7 @@
       target = document.getElementById('lastbtn');
       while (target.firstChild) {
         target.removeChild(target.lastChild);
-      };
+      }
       let btn6 = document.createElement('button');
       btn6.innerText = 'Last Move';
       btn6.onclick = lastMove;

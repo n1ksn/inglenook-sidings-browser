@@ -153,7 +153,7 @@ function pathExtensions(path, lenLimit, trkCaps) {
 
   let nSucc = successors.length;
   for (let i = 0; i < nSucc; i++) {
-    if (!(path.indexOf(successors[i]) >= 0)) {
+    if (path.indexOf(successors[i]) < 0) {
       let newPath = path.slice(0);
       newPath.push(successors[i]);
       extensions.push(newPath);
