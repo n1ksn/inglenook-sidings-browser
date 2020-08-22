@@ -1,0 +1,246 @@
+<h1 id="the-inglenook-sidings-puzzle"><u>The Inglenook Sidings Puzzle</u></h1>
+<p><font size="5"></p>
+<ul>
+<li>The Inglenook Sidings shunting puzzle uses the following track configuration with fixed track capacities. Note how the switching lead track (head shunt) is limited to the engine plus three cars.</li>
+</ul>
+<pre>
+
+                                   /------------- Track 3
+                                  /    3 cars
+    West                         /
+                                /----------------  Track 2   East
+    Switching Lead, Track 0    /       3 cars
+        (Head Shunt)          /
+     ------------------------/---------------------  Track 1
+        Engine + 3 cars                5 cars
+
+</pre>
+<ul>
+<li><p>For input and output the tracks are represented by lists containing the occupying cars in the order from west to east.</p></li>
+<li><p>The cars are represented by the numbers 1 to 8. The engine is represented by zero.</p></li>
+<li><p>The engine is assumed to be on the west end of all movements. The engine must be on the west end of track 0 in the start and end conditions (states).</p></li>
+</ul>
+<p></font></p>
+<h1 id="standard-problems"><u>Standard Problems</u></h1>
+<p><font size="5"></p>
+<ul>
+<li><p>Start: Five cars on track 1, three cars on track 2, engine on lead. Cars are randomly assigned the numbers from 1 to 8.</p></li>
+<li><p>End: Five cars on track 1, three cars on track 2, engine on lead. Cars are in increasing order starting on west end of track 1.</p></li>
+<li><p>Example:</p>
+<pre>
+Start:  Track 0: 0 (engine)
+        Track 1: 3, 2, 7, 5, 1
+        Track 2: 4, 8, 6
+        Track 3: empty
+
+End:    Track 0: 0 (engine)
+        Track 1: 1, 2, 3, 4, 5
+        Track 2: 6, 7, 8
+        Track 3: empty
+</pre>
+<p></font></p></li>
+</ul>
+<h1 id="solutions"><u>Solutions</u></h1>
+<p><font size="5"></p>
+<ul>
+<li><p>A solution is a series of puzzle “states” connected by a move, either a “pull” or “drop” of 1 to 3 cars</p></li>
+<li><p>The number of cars in a move is constrained by the track capacities</p></li>
+<li><p>Here is a solution to the example above:</p></li>
+</ul>
+<p></font> <font size="5"></p>
+<pre><code>    Moves: 14
+    Solution:
+    [[0],       [3,2,7,5,1],  [4,8,6],  []]         (Start state)
+    [[0,3],     [2,7,5,1],    [4,8,6],  []]         Pull 1 Track 1
+    [[0],       [2,7,5,1],    [4,8,6],  [3]]        Drop 1 Track 3
+    [[0,2],     [7,5,1],      [4,8,6],  [3]]        Pull 1 Track 1
+    [[0],       [7,5,1],      [4,8,6],  [2,3]]      Drop 1 Track 3
+    [[0,4,8,6], [7,5,1],      [],       [2,3]]      Pull 3 Track 2
+    [[0,4,8],   [6,7,5,1],    [],       [2,3]]      Drop 1 Track 1
+    [[0,4],     [6,7,5,1],    [8],      [2,3]]      Drop 1 Track 2
+    [[0,4,6,7], [5,1],        [8],      [2,3]]      Pull 2 Track 1
+    [[0,4],     [5,1],        [6,7,8],  [2,3]]      Drop 2 Track 2
+    [[0,4,5,1], [],           [6,7,8],  [2,3]]      Pull 2 Track 1
+    [[0,4,5],   [],           [6,7,8],  [1,2,3]]    Drop 1 Track 3
+    [[0],       [4,5],        [6,7,8],  [1,2,3]]    Drop 2 Track 1
+    [[0,1,2,3], [4,5],        [6,7,8],  []]         Pull 3 Track 3
+    [[0],       [1,2,3,4,5],  [6,7,8],  []]         Drop 3 Track 1</code></pre>
+<p></font></p>
+<h1 id="solution-methods---dijkstras-algorithm"><u>Solution Methods - Dijkstra’s Algorithm</u></h1>
+<p><font size="5"></p>
+<ul>
+<li><p>Each of the 2,580,480 possible puzzle states is a node in a graph where two nodes are connected by an edge if there is an allowed move between them. (Since any move is reversible, the edges are said to be “undirected.”)</p></li>
+<li><p>The standard final state is set as the “root node”</p></li>
+<li><p>The algorithm finds a shortest path (a series of edges) from each node to the root node</p></li>
+<li><p>In particular, a path found from any of the 40320 (= 8!) standard start states to the root node is an “optimal” puzzle solution because it has the fewest moves possible (but it is not necessarily unique)</p></li>
+<li><p>A table constructed from the algorithm can be used to produce a puzzle solution on demand when <strong><em>any</em></strong> puzzle state is set as the start; but the final state must be the <strong><em>standard</em></strong> final state unless the entire table is recalculated with a new root node.</p></li>
+</ul>
+<p></font></p>
+<h1 id="solution-methods---interated-depth-first-tree-search"><u>Solution Methods - Interated Depth-First Tree Search</u></h1>
+<p><font size="5"></p>
+<ul>
+<li><p>The start state is the root node of a tree graph. The child (successor) nodes of the root node are the puzzle states that can be reached by a single move from the root node.</p></li>
+<li><p>The child nodes of any other node are the states that can be reached by a single move from the “parent” node <strong><em>and</em></strong> meet two conditions:</p>
+<ol type="1">
+<li>The child does not appear in the “branch” from the parent back to the root</li>
+<li>The move from the parent to the child involves a track different from the track in the move from the parent of the parent to the parent</li>
+</ol></li>
+<li><p>The condition (1) above is mandatory for the graph to be a tree. The condition (2) is not required, but it cuts down the size of the tree and the time of the search without hurting the search for a shortest solution path. Because no shortest solution will have two successive moves on the same track. (Think about it!)</p></li>
+<li><p>The iterated depth-first search algorithm starts at the root node and looks for the final state by successively travelling down the paths of increasingly deeper trees until it finds a node that is the final state. The solution is then the series of nodes on the branch from the root node to the final state node.</p></li>
+<li><p>An iterated depth-first search will also find a puzzle solution with the miniumum possible number of moves. However, it can take a long time, as the trees grow very quickly in size as they get deeper.</p></li>
+</ul>
+<p></font></p>
+<h1 id="solution-methods---a-heuristic-approach"><u>Solution Methods - A Heuristic Approach</u></h1>
+<p><font size="5"></p>
+<ul>
+<li><p>If one is willing to accept solutions that are not always of shortest length (but are not <strong><em>too</em></strong> long), there is a way to modifiy the iterated depth-first approach that has “reasonable” calculation times.</p></li>
+<li><p>Start with an iterated depth-first search, but instead of ending at the final state, stop when the search comes to <strong><em>any</em></strong> node with the last two cars on Track 1 the same as the last two cars on Track 1 in the final state. Call this the “intermediate node.”</p></li>
+<li><p>Then do a second search starting from the intermediate node and ending at the final state.</p></li>
+<li><p>Splice the two partial solutions together (and drop the intermediate node if keeping it would result in two successive moves on the same track). Call this the “forward” solution.</p></li>
+<li><p>Redo the three steps above, but starting with the final state and ending with the start state. Call this the “reverse” solution.</p></li>
+<li><p>Choose the shorter of the forward and reverse solutions as the final heuristic solution, reversing the reverse solution if it was chosen.</p></li>
+</ul>
+<p></font></p>
+<h1 id="solution-methods---overall-comparison"><u>Solution Methods - Overall Comparison</u></h1>
+<style>
+th { font-size: 1.5em }
+td { font-size: 1.5em }
+</style>
+<p><font size="5"></p>
+<ul>
+<li>Here is a table showing the number of moves for the heuristic and optimal solutions to all standard start states, and a plot of their cumulative frequencies:</li>
+</ul>
+<center>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">- Moves -</th>
+<th style="text-align: center;">- Heuristic % -</th>
+<th style="text-align: center;">- Optimal % -</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">&lt; 10</td>
+<td style="text-align: center;">1.39</td>
+<td style="text-align: center;">1.70</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">1.43</td>
+<td style="text-align: center;">2.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">11</td>
+<td style="text-align: center;">2.74</td>
+<td style="text-align: center;">4.65</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">5.20</td>
+<td style="text-align: center;">7.75</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">13</td>
+<td style="text-align: center;">10.05</td>
+<td style="text-align: center;">13.49</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">13.91</td>
+<td style="text-align: center;">17.80</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">16.97</td>
+<td style="text-align: center;">20.15</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">16</td>
+<td style="text-align: center;">17.27</td>
+<td style="text-align: center;">18.42</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">17</td>
+<td style="text-align: center;">14.00</td>
+<td style="text-align: center;">9.74</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">9.34</td>
+<td style="text-align: center;">3.55</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">19</td>
+<td style="text-align: center;">5.10</td>
+<td style="text-align: center;">0.73</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">2.21</td>
+<td style="text-align: center;">0.02</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">&gt; 20</td>
+<td style="text-align: center;">0.37</td>
+<td style="text-align: center;">0.00</td>
+</tr>
+</tbody>
+</table>
+<p><img src="cumulative-distributions.png" /></p>
+</center>
+<ul>
+<li><p>We see that on the whole, the distribution of heuristic solutions is only about one move more than the optimal solutions</p></li>
+<li><p>But a more meaningful comparison, especially for the puzzle player, might be a pairwise comparison of the two solution methods</p></li>
+</ul>
+<p></font></p>
+<h1 id="solution-methods---a-pairwise-comparison"><u>Solution Methods - A Pairwise Comparison</u></h1>
+<style>
+th { font-size: 1.5em }
+td { font-size: 1.5em }
+</style>
+<p><font size="5"></p>
+<ul>
+<li><p>How does a particular heuristic solution compare to the optimal solution of the same start state? It can’t be shorter, but we hope it isn’t too much longer.</p></li>
+<li><p>Below is a frequency table for the differences (heuristic solution length) - (optimal solution length) for all 40320 standard start conditions:</p></li>
+</ul>
+<center>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Difference</th>
+<th style="text-align: center;">Percent</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">45.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">30.5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">17.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">5.5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">4 - 6</td>
+<td style="text-align: center;">1.0</td>
+</tr>
+</tbody>
+</table>
+</center>
+<ul>
+<li><p>About 45% of the puzzle start states have a heuristic solution that is optimal (minimum possible number of moves)</p></li>
+<li><p>About 31% of the heuristic solutions are only one move longer than the minimum possible</p></li>
+<li><p>About 18% are only two moves longer</p></li>
+<li><p>About 6% are three moves longer</p></li>
+<li><p>One percent are four or more moves longer</p></li>
+</ul>
+<p></font></p>
